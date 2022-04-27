@@ -1,5 +1,6 @@
 use std::default::Default;
-use std::fmt::Display;
+
+use std::fmt::{Debug, Display};
 
 #[derive(Clone)]
 struct Matrix<const H: usize, const W: usize, Inner> {
@@ -17,6 +18,23 @@ where
                 write!(f, "{:5}, ", self.e[y][x])?;
             }
             writeln!(f, "")?;
+        }
+
+        Ok(())
+    }
+}
+impl<const H: usize, const W: usize, Inner> Debug for Matrix<H, W, Inner>
+where
+    Inner: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let (h, w) = self.get_size();
+        for y in 0..h {
+            write!(f, "[")?;
+            for x in 0..w {
+                write!(f, "{:5?}, ", self.e[y][x])?;
+            }
+            write!(f, "], ")?;
         }
 
         Ok(())
@@ -59,19 +77,43 @@ where
     }
 }
 
-use std::ops::Add;
-impl<const H: usize, const W: usize, Inner> Add for Matrix<H, W, Inner>
+use std::cmp::PartialEq;
+impl<const H: usize, const W: usize, InnerLeft, InnerRight> PartialEq<Matrix<H, W, InnerRight>>
+    for Matrix<H, W, InnerLeft>
 where
-    Inner: Copy + Add,
-    <Inner as Add>::Output: Copy + Default,
+    InnerLeft: PartialEq<InnerRight>,
 {
-    type Output = Matrix<H, W, <Inner as Add>::Output>;
-    fn add(self, lhs: Self) -> Self::Output {
+    fn eq(&self, lhs: &Matrix<H, W, InnerRight>) -> bool {
+        for h in 0..H {
+            for w in 0..W {
+                if self.e[h][w] != lhs.e[h][w] {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+}
+/*
+use std::cmp::Eq;
+impl<const H: usize, const W: usize, Inner> Eq for Matrix<W, H, Inner> where Inner: Eq {}
+*/
+
+use std::ops::Add;
+impl<const H: usize, const W: usize, InnerLeft, InnerRight, InnerOut> Add<Matrix<H, W, InnerRight>>
+    for Matrix<H, W, InnerLeft>
+where
+    InnerOut: Default + Copy,
+    InnerLeft: Clone + Add<InnerRight, Output = InnerOut>,
+    InnerRight: Clone,
+{
+    type Output = Matrix<H, W, InnerOut>;
+    fn add(self, lhs: Matrix<H, W, InnerRight>) -> Self::Output {
         // TODO: replace with lapack.
         let mut output = Matrix::default();
         for h in 0..H {
             for w in 0..W {
-                output.e[w][h] = self.e[w][h] + lhs.e[w][h];
+                output.e[h][w] = self.e[h][w].clone() + lhs.e[h][w].clone();
             }
         }
 
@@ -79,17 +121,91 @@ where
     }
 }
 
-/*
-use std::ops::Mul;
-impl<const LH: usize, const LH: usize, const RH: usize, Inner> Mul for Matrix<LW, LH, Inner> {
-    // Matrix(LW*LH) * Matrix(LH*RH)
-}
-*/
-
-fn main() {
-    let n = Matrix {
-        e: [[10, 20, 30], [40, 50, 60]],
+#[test]
+fn test_matrix_addition() {
+    let left = Matrix {
+        e: [[1., 2., 3.], [4., 5., 6.]],
+    };
+    let right = Matrix {
+        e: [[6., 5., 4.], [3., 2., 1.]],
+    };
+    let expect = Matrix {
+        e: [[7., 7., 7.], [7., 7., 7.]],
     };
 
-    println!("{}", n);
+    assert_eq!(left + right, expect);
+}
+
+use std::ops::Sub;
+impl<const H: usize, const W: usize, InnerLeft, InnerRight, InnerOut> Sub<Matrix<H, W, InnerRight>>
+    for Matrix<H, W, InnerLeft>
+where
+    InnerOut: Default + Copy,
+    InnerLeft: Clone + Sub<InnerRight, Output = InnerOut>,
+    InnerRight: Clone,
+{
+    type Output = Matrix<H, W, InnerOut>;
+    fn sub(self, lhs: Matrix<H, W, InnerRight>) -> Self::Output {
+        // TODO: replace with lapack.
+        let mut output = Matrix::default();
+        for h in 0..H {
+            for w in 0..W {
+                output.e[h][w] = self.e[h][w].clone() - lhs.e[h][w].clone();
+            }
+        }
+
+        output
+    }
+}
+
+use std::ops::{AddAssign, Mul};
+impl<const LH: usize, const LWRH: usize, const RW: usize, InnerLeft, InnerRight, InnerOut>
+    Mul<Matrix<LWRH, RW, InnerRight>> for Matrix<LH, LWRH, InnerLeft>
+where
+    InnerOut: Default + Copy + AddAssign,
+    InnerLeft: Clone + Mul<InnerRight, Output = InnerOut>,
+    InnerRight: Clone,
+{
+    // Matrix(LH*LW) * Matrix(LW*RW)
+    type Output = Matrix<LH, RW, InnerOut>;
+    fn mul(self, lhs: Matrix<LWRH, RW, InnerRight>) -> Self::Output {
+        let mut ret = Matrix::default();
+
+        for h in 0..ret.get_size().0 {
+            for w in 0..ret.get_size().1 {
+                for index in 0..LWRH {
+                    ret.e[h][w] += self.e[h][index].clone() * lhs.e[index][w].clone();
+                }
+            }
+        }
+
+        ret
+    }
+}
+
+#[test]
+fn test_matrix_multiple() {
+    let l = Matrix {
+        e: [[1., 2., 3.], [4., 5., 6.]],
+    };
+    let r = Matrix {
+        e: [[1., 2.], [3., 4.], [5., 6.]],
+    };
+
+    let expect = Matrix {
+        e: [[22., 28.], [49., 64.]],
+    };
+
+    assert_eq!(l * r, expect);
+}
+
+fn main() {
+    let l = Matrix {
+        e: [[1., 2., 3.], [4., 5., 6.]],
+    };
+    let r = Matrix {
+        e: [[1., 2.], [3., 4.], [5., 6.]],
+    };
+
+    println!("{}", l * r);
 }
