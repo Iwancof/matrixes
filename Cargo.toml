@@ -5,13 +5,13 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[profile.release]
+lto = true
+opt-level = 3
+
 [dependencies]
 lapack = "0.19.0"
 openblas-src = {version = "0.10.4", optional = true}
 
-
 [features]
-default = ["openblas"]
-
-openblas = ["openblas-src"]
 pure_rust = []

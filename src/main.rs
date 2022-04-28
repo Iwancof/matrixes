@@ -10,20 +10,35 @@ extern crate openblas_src;
 #[derive(Clone)]
 struct Matrix<const H: usize, const W: usize, Inner> {
     e: [[Inner; W]; H],
-    // e: [Inner; H * W],
 }
 
-/*
-impl<const H: usize, const W: usize, Inner> Matrix<H, W, Inner> {
-    #[inline]
-    fn like_matrix(&self) -> &[[Inner; W]; H] {
-        let (slice, remain) = self.e.as_chunks::<W>();
+macro_rules! create_util_const_matrixes {
+    ($type: ty) => {
+        impl<const S: usize> Matrix<S, S, $type> {
+            fn one() -> Self {
+                let mut ret = [[0 as $type; S]; S];
+                for i in 0..S {
+                    ret[i][i] = 1 as $type;
+                }
 
-        assert_eq!(slice.len(), H);
-        slice
-    }
+                Matrix { e: ret }
+            }
+        }
+    };
 }
-*/
+
+create_util_const_matrixes!(f32);
+create_util_const_matrixes!(f64);
+
+#[test]
+fn one_matrix_test() {
+    let a = Matrix {
+        e: [[1., 0.], [0., 1.]],
+    };
+    let m = Matrix::<2, 2, f32>::one();
+
+    assert_eq!(a, m);
+}
 
 impl<const H: usize, const W: usize, Inner> Display for Matrix<H, W, Inner>
 where
@@ -73,6 +88,9 @@ where
 impl<const H: usize, const W: usize, Inner> TMatrix for Matrix<H, W, Inner> {
     #[allow(unused)]
     fn get_size(&self) -> (usize, usize) {
+        Self::get_size_type()
+    }
+    fn get_size_type() -> (usize, usize) {
         (H, W)
     }
 }
@@ -82,28 +100,115 @@ trait TMatrix {
     fn is_regular(&self) -> bool {
         self.get_size().0 == self.get_size().1
     }
+    fn get_size_type() -> (usize, usize);
 }
 
-trait TRegularMatrix: TMatrix {
-    fn inv_into_ref(&self, target: &mut Self) {}
+#[derive(Debug, Clone, Copy)]
+enum InverseError {
+    Singular,
+}
+
+trait TRegularMatrix: TMatrix + Sized {
+    unsafe fn inv_into_ptr(&self, target: *mut Self) -> Option<InverseError>;
+    fn inv_into_ref(&self, target: &mut Self) -> Option<InverseError> {
+        unsafe { self.inv_into_ptr(target as *mut Self) }
+    }
+    fn inv(&self) -> Result<Self, InverseError> {
+        use std::mem::MaybeUninit;
+
+        let mut target = MaybeUninit::<Self>::uninit();
+        unsafe {
+            let ret = self.inv_into_ptr(target.as_mut_ptr());
+
+            match ret {
+                None => Ok(target.assume_init()),
+                Some(err) => Err(err),
+            }
+        }
+    }
 }
 
 impl<const S: usize, Inner> TRegularMatrix for Matrix<S, S, Inner>
 where
     Inner: Copy,
 {
-    default fn inv_into_ref(&self, target: &mut Self) {
+    default unsafe fn inv_into_ptr(&self, target: *mut Self) -> Option<InverseError> {
         todo!()
     }
 }
 
-// TODO: replace Matrix::e to one array. and use it with chunked function.
+macro_rules! create_inverse_trait_implementation {
+    ($f: ident, $i: ident, $type: ty) => {
+        impl<const S: usize> TRegularMatrix for Matrix<S, S, $type> {
+            unsafe fn inv_into_ptr(&self, target: *mut Self) -> Option<InverseError> {
+                #[link(name = "lapack")]
+                extern "C" {
+                    fn $f(
+                        // fn sgetrf_(
+                        m: *const i32,
+                        n: *const i32,
+                        A: *mut f32,
+                        lda: *mut i32,
+                        ipiv: *mut i32,
+                        info: *mut i32,
+                    );
 
-impl<const S: usize> TRegularMatrix for Matrix<S, S, f32> {
-    fn inv_into_ref(&self, target: &mut Self) {
-        use lapack::sgetri;
-        // sgetri(S as i32,1
-    }
+                    fn $i(
+                        n: *const i32,
+                        A: *mut f32,
+                        lda: *mut i32,
+                        ipiv: *mut i32,
+                        work: *mut f32,
+                        lwork: *mut i32,
+                        info: *mut i32,
+                    );
+                }
+
+                *target = self.clone();
+
+                let m: *const i32 = &(S as i32);
+                let n: *const i32 = &(S as i32);
+                let a: *mut f32 = (*target).e.as_mut_ptr() as *mut f32;
+                let lda: *mut i32 = &mut (S as i32);
+                let ipiv: *mut i32 = [0; S].as_mut_ptr() as *mut i32;
+                let info: *mut i32 = &mut 0;
+
+                $f(m, n, a, lda, ipiv, info);
+                if *info != 0 {
+                    return match *info {
+                        _ => Some(InverseError::Singular),
+                    };
+                }
+
+                let work: *mut f32 = [0.0; S].as_mut_ptr() as *mut f32;
+                let lwork: *mut i32 = &mut (S as i32);
+
+                $i(n, a, lda, ipiv, work, lwork, info);
+                if *info != 0 {
+                    return match *info {
+                        _ => Some(InverseError::Singular),
+                    };
+                }
+
+                None
+            }
+        }
+    };
+}
+
+create_inverse_trait_implementation!(sgetrf_, sgetri_, f32);
+create_inverse_trait_implementation!(dgetrf_, dgetri_, f64);
+
+#[test]
+fn test_inverse() {
+    let m = Matrix::<2, 2, f32> {
+        e: [[4., 2.], [1., 3.]],
+    };
+    let ans = Matrix::<2, 2, f32> {
+        e: [[0.3, -0.2], [-0.1, 0.4]],
+    };
+
+    assert_eq!(m.inv().unwrap(), ans);
 }
 
 use std::cmp::PartialEq;
@@ -123,10 +228,6 @@ where
         true
     }
 }
-/*
-use std::cmp::Eq;
-impl<const H: usize, const W: usize, Inner> Eq for Matrix<W, H, Inner> where Inner: Eq {}
-*/
 
 use std::ops::Add;
 impl<const H: usize, const W: usize, InnerLeft, InnerRight, InnerOut> Add<Matrix<H, W, InnerRight>>
@@ -197,7 +298,7 @@ where
 {
     // Matrix(LH*LW) * Matrix(LW*RW)
     type Output = Matrix<LH, RW, InnerOut>;
-    fn mul(self, lhs: Matrix<LWRH, RW, InnerRight>) -> Self::Output {
+    default fn mul(self, lhs: Matrix<LWRH, RW, InnerRight>) -> Self::Output {
         let mut ret = Matrix::default();
 
         for h in 0..ret.get_size().0 {
@@ -208,20 +309,101 @@ where
             }
         }
 
+        // println!("Call default");
+
         ret
     }
 }
 
+macro_rules! create_mul_trait_implementation {
+    ($f: ident, $type: ty) => {
+        impl<const LH: usize, const LWRH: usize, const RW: usize> Mul<Matrix<LWRH, RW, $type>>
+            for Matrix<LH, LWRH, $type>
+        {
+            // Matrix(LH*LW) * Matrix(LW*RW)
+            #[inline(never)]
+            fn mul(self, lhs: Matrix<LWRH, RW, $type>) -> Self::Output {
+                extern "C" {
+                    fn $f(
+                        // C = alpha * A * B + beta * C
+                        trans_mode_a: *const i8,
+                        trans_mode_b: *const i8,
+                        height_of_a: *const i32,
+                        width_of_b: *const i32,
+                        widht_of_a_height_of_b: *const i32,
+                        alpha: *const $type,
+                        a: *const $type,
+                        leading_a: *const i32,
+                        b: *const $type,
+                        leading_b: *const i32,
+                        beta: *const $type,
+                        c: *mut $type,
+                        leading_c: *const i32,
+                    );
+                }
+                use core::mem::MaybeUninit;
+
+                let mut ret = MaybeUninit::<[[$type; RW]; LH]>::uninit();
+
+                let (ah, aw) = self.get_size();
+                let (bh, bw) = lhs.get_size();
+                let (ch, cw) = Self::Output::get_size_type();
+
+                let trans_mode_a: *const i8 = &('N' as i8);
+                let trans_mode_b: *const i8 = &('N' as i8);
+                let height_of_a: *const i32 = &(ah as i32);
+                let width_of_b: *const i32 = &(bw as i32);
+                let widht_of_a_height_of_b: *const i32 = &(aw as i32); // aw == bh
+                let alpha: *const $type = &1.0;
+                let a: *const $type = self.e.as_ptr() as *const _;
+                let leading_a: *const i32 = &(ah as i32);
+                let b: *const $type = self.e.as_ptr() as *const _;
+                let leading_b: *const i32 = &(bh as i32);
+                let beta: *const $type = &0.0;
+                let c: *mut $type = ret.as_mut_ptr() as *mut _;
+                let leading_c: *const i32 = &(ch as i32);
+
+                unsafe {
+                    $f(
+                        trans_mode_a,
+                        trans_mode_b,
+                        height_of_a,
+                        width_of_b,
+                        widht_of_a_height_of_b,
+                        alpha,
+                        a,
+                        leading_a,
+                        b,
+                        leading_b,
+                        beta,
+                        c,
+                        leading_c,
+                    );
+                }
+
+                unsafe {
+                    Matrix {
+                        e: ret.assume_init(),
+                    }
+                }
+            }
+        }
+    };
+}
+
+create_mul_trait_implementation!(sgemm_, f32);
+create_mul_trait_implementation!(dgemm_, f64);
+
 #[test]
 fn test_matrix_multiple() {
-    let l = Matrix {
+    let l = Matrix::<2, 3, f32> {
         e: [[1., 2., 3.], [4., 5., 6.]],
     };
-    let r = Matrix {
+    let r = Matrix::<3, 2, f32> {
         e: [[1., 2.], [3., 4.], [5., 6.]],
     };
 
-    let expect = Matrix {
+    let expect = Matrix::<2, 2, f32> {
         e: [[22., 28.], [49., 64.]],
     };
 
@@ -230,11 +412,21 @@ fn test_matrix_multiple() {
 
 fn main() {
     let l = Matrix {
-        e: [[1., 2., 3.], [4., 5., 6.]],
+        e: [[1., 2.], [4., 5.]],
     };
     let r = Matrix {
-        e: [[1., 2.], [3., 4.], [5., 6.]],
+        e: [[3., 7.], [2., 4.]],
     };
 
-    println!("{}", l * r);
+    println!("{:?}", l * r);
+    /*
+    // let mut target = Matrix::default();
+
+    // l.inv_into_ref(&mut target);
+
+    // let target = l.inv().unwrap();
+
+    println!("{:?}", target);
+    println!("{:?}", l * target);
+    */
 }
