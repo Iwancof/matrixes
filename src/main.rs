@@ -1,11 +1,29 @@
+#![allow(incomplete_features)]
+#![feature(specialization)]
+
 use std::default::Default;
 
 use std::fmt::{Debug, Display};
 
+extern crate openblas_src;
+
 #[derive(Clone)]
 struct Matrix<const H: usize, const W: usize, Inner> {
     e: [[Inner; W]; H],
+    // e: [Inner; H * W],
 }
+
+/*
+impl<const H: usize, const W: usize, Inner> Matrix<H, W, Inner> {
+    #[inline]
+    fn like_matrix(&self) -> &[[Inner; W]; H] {
+        let (slice, remain) = self.e.as_chunks::<W>();
+
+        assert_eq!(slice.len(), H);
+        slice
+    }
+}
+*/
 
 impl<const H: usize, const W: usize, Inner> Display for Matrix<H, W, Inner>
 where
@@ -52,28 +70,39 @@ where
     }
 }
 
-impl<const H: usize, const W: usize, Inner> Matrix<H, W, Inner> {
+impl<const H: usize, const W: usize, Inner> TMatrix for Matrix<H, W, Inner> {
     #[allow(unused)]
     fn get_size(&self) -> (usize, usize) {
         (H, W)
     }
+}
 
-    #[allow(unused)]
+trait TMatrix {
+    fn get_size(&self) -> (usize, usize);
     fn is_regular(&self) -> bool {
-        H == W
+        self.get_size().0 == self.get_size().1
     }
 }
 
-impl<const S: usize, Inner> Matrix<S, S, Inner>
+trait TRegularMatrix: TMatrix {
+    fn inv_into_ref(&self, target: &mut Self) {}
+}
+
+impl<const S: usize, Inner> TRegularMatrix for Matrix<S, S, Inner>
 where
     Inner: Copy,
 {
-    fn inv_ref(&self, target: &mut Self) {
-        for h in 0..S {
-            for w in 0..S {
-                target.e[h][w] = self.e[h][w];
-            }
-        }
+    default fn inv_into_ref(&self, target: &mut Self) {
+        todo!()
+    }
+}
+
+// TODO: replace Matrix::e to one array. and use it with chunked function.
+
+impl<const S: usize> TRegularMatrix for Matrix<S, S, f32> {
+    fn inv_into_ref(&self, target: &mut Self) {
+        use lapack::sgetri;
+        // sgetri(S as i32,1
     }
 }
 
@@ -109,15 +138,16 @@ where
 {
     type Output = Matrix<H, W, InnerOut>;
     fn add(self, lhs: Matrix<H, W, InnerRight>) -> Self::Output {
-        // TODO: replace with lapack.
-        let mut output = Matrix::default();
-        for h in 0..H {
-            for w in 0..W {
-                output.e[h][w] = self.e[h][w].clone() + lhs.e[h][w].clone();
+        {
+            let mut output = Matrix::default();
+            for h in 0..H {
+                for w in 0..W {
+                    output.e[h][w] = self.e[h][w].clone() + lhs.e[h][w].clone();
+                }
             }
-        }
 
-        output
+            output
+        }
     }
 }
 
@@ -146,7 +176,6 @@ where
 {
     type Output = Matrix<H, W, InnerOut>;
     fn sub(self, lhs: Matrix<H, W, InnerRight>) -> Self::Output {
-        // TODO: replace with lapack.
         let mut output = Matrix::default();
         for h in 0..H {
             for w in 0..W {
