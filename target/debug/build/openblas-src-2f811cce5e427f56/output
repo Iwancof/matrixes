@@ -1,0 +1,12 @@
+cargo:warning=OpenBLAS is built as a shared library. You need to set LD_LIBRARY_PATH=/home/iwancof/WorkSpace/IntelligenceSystem/matrixes/target/debug/build/openblas-src-2f811cce5e427f56/out
+cargo:rustc-link-search=/home/iwancof/WorkSpace/IntelligenceSystem/matrixes/target/debug/build/openblas-src-2f811cce5e427f56/out
+cargo:rustc-link-search=/usr/lib
+cargo:rustc-link-search=/usr/lib/gcc/x86_64-pc-linux-gnu/11.2.0
+cargo:rustc-link-lib=c
+cargo:rustc-link-search=/usr/lib
+cargo:rustc-link-search=/usr/lib/gcc/x86_64-pc-linux-gnu/11.2.0
+cargo:rustc-link-lib=c
+cargo:rustc-link-lib=gfortran
+cargo:rustc-link-lib=m
+cargo:rustc-link-lib=quadmath
+cargo:rustc-link-lib=dylib=openblas
