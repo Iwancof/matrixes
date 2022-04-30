@@ -1,7 +1,9 @@
+use crate::matrix::lu;
 use crate::{Matrix, TMatrix};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InverseError {
+    LuError(lu::LuError),
     ArgumentError(u8),
     Singular,
 }
@@ -36,20 +38,15 @@ where
 }
 
 macro_rules! create_inverse_trait_implementation {
-    ($f: ident, $i: ident, $type: ty) => {
-        impl<const S: usize> TRegularMatrix for Matrix<S, S, $type> {
+    ($i: ident, $type: ty) => {
+        impl<const S: usize> TRegularMatrix for Matrix<S, S, $type>
+        where
+            [(); lu::min(S, S)]:,
+        {
+            // #[inline(never)]
             unsafe fn inv_into_ptr(&self, target: *mut Self) -> Option<InverseError> {
                 #[link(name = "lapack")]
                 extern "C" {
-                    fn $f(
-                        // fn sgetrf_(
-                        m: *const i32,   // integer
-                        n: *const i32,   // integer
-                        A: *mut $type,   // array of $type. length = S * S
-                        lda: *const i32, // integer
-                        ipiv: *mut i32,  // array of integer. length = S
-                        info: *mut i32,  // integer
-                    );
 
                     fn $i(
                         n: *const i32,     // integer
@@ -62,33 +59,22 @@ macro_rules! create_inverse_trait_implementation {
                     );
                 }
 
-                *target = self.clone();
+                use lu::TFactorizeLU;
+                let mut lu = self
+                    .clone()
+                    .lu()
+                    .map_err(|err| InverseError::LuError(err))
+                    .ok()?;
 
-                let m: *const i32 = &(S as i32);
+                let (a, ipiv): (*mut $type, *const i32) = lu.as_ptr_mut_e_const_piv();
                 let n: *const i32 = &(S as i32);
-                let a: *mut $type = (*target).as_mut_ptr() as *mut $type;
                 let lda: *const i32 = &(S as i32);
-                let mut ipiv: [i32; S] = [0; S];
-                // let ipiv: *mut i32 = [0 as i32; S].as_mut_ptr() as *mut i32;
+                let mut work: [$type; S] = [0.0; S];
+                let lwork: *const i32 = &(S as i32);
                 let info: *mut i32 = &mut 0;
 
-                println!("{}", *target);
-                $f(m, n, a, lda, ipiv.as_mut_ptr(), info);
-                println!("{}", *target);
-                println!("{:?}", ipiv);
-                if *info != 0 {
-                    return match *info {
-                        -6..=-1 => Some(InverseError::ArgumentError((-*info) as u8)),
-                        _ => Some(InverseError::Singular),
-                    };
-                }
+                $i(n, a, lda, ipiv, work.as_mut_ptr(), lwork, info);
 
-                let mut work: [$type; S] = [0.0; S];
-                // let work: *mut $type = [0.0 as $type; S].as_mut_ptr() as *mut $type;
-                let lwork: *const i32 = &(S as i32);
-                // let lwork: *mut i32 = &mut 1;
-
-                $i(n, a, lda, ipiv.as_ptr(), work.as_mut_ptr(), lwork, info);
                 if *info != 0 {
                     return match *info {
                         -7..=-1 => Some(InverseError::ArgumentError((-*info) as u8)),
@@ -96,14 +82,16 @@ macro_rules! create_inverse_trait_implementation {
                     };
                 }
 
+                *target = lu.into();
+
                 None
             }
         }
     };
 }
 
-create_inverse_trait_implementation!(sgetrf_, sgetri_, f32);
-create_inverse_trait_implementation!(dgetrf_, dgetri_, f64);
+create_inverse_trait_implementation!(sgetri_, f32);
+create_inverse_trait_implementation!(dgetri_, f64);
 
 #[cfg(test)]
 mod test {

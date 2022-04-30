@@ -1,4 +1,5 @@
 use crate::{Matrix, TMatrix};
+use std::convert::Into;
 use std::fmt::{Debug, Display};
 
 pub const fn min(a: usize, b: usize) -> usize {
@@ -7,6 +8,13 @@ pub const fn min(a: usize, b: usize) -> usize {
     } else {
         b
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum LuError {
+    InvalidArgument(u8),
+    Other(i32),
+    // TODO: Add more errors
 }
 
 #[repr(C)]
@@ -32,6 +40,26 @@ where
     #[allow(unused)]
     pub fn at_mut(&mut self, row: usize, col: usize) -> &mut Inner {
         &mut self.e[col][row]
+    }
+    #[inline(always)]
+    #[allow(unused)]
+    pub fn as_ptr_mut_e_const_piv(&mut self) -> (*mut Inner, *const i32) {
+        (self.e.as_mut_ptr() as _, self.ipiv.as_ptr())
+    }
+    #[inline(always)]
+    #[allow(unused)]
+    pub fn as_ptr(&self) -> (*const Inner, *const i32) {
+        (self.e.as_ptr() as _, self.ipiv.as_ptr())
+    }
+}
+
+impl<const H: usize, const W: usize, Inner> Into<Matrix<H, W, Inner>> for FactorizeLU<H, W, Inner>
+where
+    [(); min(H, W)]:,
+{
+    #[inline(always)]
+    fn into(self) -> Matrix<H, W, Inner> {
+        Matrix::new(self.e)
     }
 }
 
@@ -111,14 +139,14 @@ pub trait TFactorizeLU<const H: usize, const W: usize, Inner>: TMatrix
 where
     [(); min(H, W)]:,
 {
-    fn lu(self) -> FactorizeLU<H, W, Inner>;
+    fn lu(self) -> Result<FactorizeLU<H, W, Inner>, LuError>;
 }
 
 impl<const H: usize, const W: usize, Inner> TFactorizeLU<H, W, Inner> for Matrix<H, W, Inner>
 where
     [(); min(H, W)]:,
 {
-    default fn lu(self) -> FactorizeLU<H, W, Inner> {
+    default fn lu(self) -> Result<FactorizeLU<H, W, Inner>, LuError> {
         unimplemented!()
     }
 }
@@ -129,7 +157,7 @@ macro_rules! create_lu_decom_imple {
         where
             [(); min(H, W)]:,
         {
-            default fn lu(mut self) -> FactorizeLU<H, W, $type> {
+            default fn lu(mut self) -> Result<FactorizeLU<H, W, $type>, LuError> {
                 extern "C" {
                     fn $f(
                         m: *const i32,   // integer
@@ -153,15 +181,20 @@ macro_rules! create_lu_decom_imple {
                 let info: *mut i32 = &mut 0;
 
                 unsafe { $f(m, n, a, lda, ipiv.as_mut_ptr(), info) };
-                println!("{:?}", ipiv);
+                unsafe {
+                    if *info != 0 {
+                        return match *info {
+                            -6..=-1 => Err(LuError::InvalidArgument((-*info) as u8)),
+                            _ => Err(LuError::Other(*info)),
+                        };
+                    };
+                }
 
-                // unsafe { println!("{}", *info) };
-
-                FactorizeLU {
+                Ok(FactorizeLU {
                     e: self.e,
                     // ipiv: ipiv[0..2].try_into().unwrap(),
                     ipiv,
-                }
+                })
             }
         }
     };
@@ -177,7 +210,7 @@ mod test {
     #[test]
     fn factorize_lu_f32() {
         let m = Matrix::new([[2., 4.], [9., 4.]]);
-        let lu = m.lu();
+        let lu = m.lu().unwrap();
 
         let l = Matrix::new([[1., 0.5], [0., 1.]]);
         let u = Matrix::new([[4., 0.], [4., 7.]]);
@@ -189,7 +222,7 @@ mod test {
     #[test]
     fn factorize_lu_f64() {
         let m = Matrix::new([[2., 4.], [9., 4.]]);
-        let lu = m.lu();
+        let lu = m.lu().unwrap();
 
         let l = Matrix::new([[1., 0.5], [0., 1.]]);
         let u = Matrix::new([[4., 0.], [4., 7.]]);

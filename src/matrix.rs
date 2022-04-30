@@ -3,10 +3,10 @@ pub mod lu;
 use std::default::Default;
 
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Matrix<const H: usize, const W: usize, Inner> {
     // e: [[Inner; W]; H],
-    e: [[Inner; H]; W],
+    e: [[Inner; H]; W], // this will be packed.
 }
 
 pub trait TMatrix {
@@ -145,16 +145,57 @@ where
     }
 }
 
-use std::cmp::PartialEq;
-impl<const H: usize, const W: usize, InnerLeft, InnerRight> PartialEq<Matrix<H, W, InnerRight>>
-    for Matrix<H, W, InnerLeft>
+use float_cmp::ApproxEq;
+impl<const H: usize, const W: usize, Inner, M> ApproxEq for Matrix<H, W, Inner>
 where
-    InnerLeft: PartialEq<InnerRight>,
+    M: Copy + Default,
+    Inner: ApproxEq<Margin = M> + Copy,
 {
-    fn eq(&self, lhs: &Matrix<H, W, InnerRight>) -> bool {
-        for h in 0..H {
-            for w in 0..W {
-                if self.at(h, w) != lhs.at(h, w) {
+    type Margin = M;
+    fn approx_eq<T>(self, other: Self, margin: T) -> bool
+    where
+        T: Into<Self::Margin>,
+    {
+        let margin = margin.into();
+        let (h, w) = self.get_size();
+        for y in 0..h {
+            for x in 0..w {
+                if !self.at(y, x).approx_eq(*other.at(y, x), margin) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+}
+
+use num_traits::identities::{One, Zero};
+impl<const S: usize, Inner> One for Matrix<S, S, Inner>
+where
+    Inner: One + std::ops::AddAssign + Default + Copy + Zero,
+{
+    fn one() -> Self {
+        Self::by_f(|col, row| {
+            if col == row {
+                Inner::one()
+            } else {
+                Inner::zero()
+            }
+        })
+    }
+}
+impl<const H: usize, const W: usize, Inner> Zero for Matrix<H, W, Inner>
+where
+    Inner: Zero + Copy + Default,
+{
+    fn zero() -> Self {
+        Self::by(Inner::zero())
+    }
+    fn is_zero(&self) -> bool {
+        let (h, w) = self.get_size();
+        for y in 0..h {
+            for x in 0..w {
+                if !self.at(y, x).is_zero() {
                     return false;
                 }
             }
