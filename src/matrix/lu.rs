@@ -135,7 +135,7 @@ where
     }
 }
 
-pub trait TFactorizeLU<const H: usize, const W: usize, Inner>: TMatrix
+pub trait TFactorizeLU<const H: usize, const W: usize, Inner>: TMatrix<H, W, Inner>
 where
     [(); min(H, W)]:,
 {

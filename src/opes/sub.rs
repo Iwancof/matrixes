@@ -1,4 +1,4 @@
-use crate::Matrix;
+use crate::{Matrix, TMatrix};
 
 use std::ops::Sub;
 impl<const H: usize, const W: usize, InnerLeft, InnerRight, InnerOut> Sub<Matrix<H, W, InnerRight>>

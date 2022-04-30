@@ -11,13 +11,18 @@ mod regular;
 
 extern crate openblas_src;
 
+use matrix::lu::TFactorizeLU;
 use matrix::{Matrix, TMatrix};
 
 fn main() {
-    let a = Matrix::new([[3., 2., 1.], [4., 5., 3.], [1., 6., 3.]]);
-    let b = Matrix::new([[48., 56., 32.], [57., 59., 34.]]);
-    let ans = Matrix::new([[5., 8., 1.], [7., 9., 0.]]);
+    let a = Matrix::new([[3., 2., 1.], [4., 5., 3.], [1., 6., 3.]])
+        .lu()
+        .unwrap();
+    let b_1 = Matrix::new([[48., 0., 32.], [0., 59., 0.]]);
+    let b_2 = Matrix::new([[0., 56., 0.], [57., 0., 34.]]);
 
-    let x = solve!(a times x = b).unwrap();
+    let x = solve!(a times ? = b_1 + b_2).unwrap();
     println!("{}", x);
+
+    let ans = Matrix::new([[5., 8., 1.], [7., 9., 0.]]);
 }

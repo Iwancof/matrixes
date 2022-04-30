@@ -1,4 +1,4 @@
-use crate::Matrix;
+use crate::{Matrix, TMatrix};
 
 use std::cmp::PartialEq;
 use std::fmt::{Debug, Display};

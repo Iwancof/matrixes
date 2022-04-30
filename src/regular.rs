@@ -8,7 +8,7 @@ pub enum InverseError {
     Singular,
 }
 
-pub trait TRegularMatrix: TMatrix + Sized {
+pub trait TRegularMatrix<const S: usize, Inner>: TMatrix<S, S, Inner> + Sized {
     unsafe fn inv_into_ptr(&self, target: *mut Self) -> Option<InverseError>;
     fn inv_into_ref(&self, target: &mut Self) -> Option<InverseError> {
         unsafe { self.inv_into_ptr(target) }
@@ -28,7 +28,7 @@ pub trait TRegularMatrix: TMatrix + Sized {
     }
 }
 
-impl<const S: usize, Inner> TRegularMatrix for Matrix<S, S, Inner>
+impl<const S: usize, Inner> TRegularMatrix<S, Inner> for Matrix<S, S, Inner>
 where
     Inner: Copy,
 {
@@ -39,7 +39,7 @@ where
 
 macro_rules! create_inverse_trait_implementation {
     ($i: ident, $type: ty) => {
-        impl<const S: usize> TRegularMatrix for Matrix<S, S, $type>
+        impl<const S: usize> TRegularMatrix<S, $type> for Matrix<S, S, $type>
         where
             [(); lu::min(S, S)]:,
         {

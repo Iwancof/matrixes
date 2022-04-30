@@ -9,35 +9,31 @@ pub struct Matrix<const H: usize, const W: usize, Inner> {
     e: [[Inner; H]; W], // this will be packed.
 }
 
-pub trait TMatrix {
+pub trait TMatrix<const H: usize, const W: usize, Inner> {
     fn get_size(&self) -> (usize, usize);
     fn is_regular(&self) -> bool {
         self.get_size().0 == self.get_size().1
     }
     fn get_size_type() -> (usize, usize);
+
+    fn inner(&self) -> &[[Inner; H]; W];
+    fn inner_mut(&mut self) -> &mut [[Inner; H]; W];
+
+    fn as_ptr(&self) -> *const Inner {
+        self.inner().as_ptr() as _
+    }
+    fn as_mut_ptr(&mut self) -> *mut Inner {
+        self.inner_mut().as_mut_ptr() as _
+    }
+    fn at(&self, row: usize, col: usize) -> &Inner {
+        &self.inner()[col][row]
+    }
+    fn at_mut(&mut self, row: usize, col: usize) -> &mut Inner {
+        &mut self.inner_mut()[col][row]
+    }
 }
 
 impl<const H: usize, const W: usize, Inner> Matrix<H, W, Inner> {
-    #[inline(always)]
-    #[allow(unused)]
-    pub const fn at(&self, row: usize, col: usize) -> &Inner {
-        &self.e[col][row]
-    }
-    #[inline(always)]
-    #[allow(unused)]
-    pub fn at_mut(&mut self, row: usize, col: usize) -> &mut Inner {
-        &mut self.e[col][row]
-    }
-    #[inline(always)]
-    #[allow(unused)]
-    pub const fn as_ptr(&self) -> *const Inner {
-        &self.e[0][0] as *const _
-    }
-    #[inline(always)]
-    #[allow(unused)]
-    pub fn as_mut_ptr(&mut self) -> *mut Inner {
-        &mut self.e[0][0] as *mut _
-    }
     #[inline(always)]
     #[allow(unused)]
     pub const fn by(v: Inner) -> Self
@@ -82,11 +78,25 @@ where
     }
 }
 
-impl<const H: usize, const W: usize, Inner> TMatrix for Matrix<H, W, Inner> {
+impl<const H: usize, const W: usize, Inner> TMatrix<H, W, Inner> for Matrix<H, W, Inner> {
     #[allow(unused)]
+    #[inline(always)]
+    fn inner(&self) -> &[[Inner; H]; W] {
+        &self.e
+    }
+    #[allow(unused)]
+    #[inline(always)]
+    fn inner_mut(&mut self) -> &mut [[Inner; H]; W] {
+        &mut self.e
+    }
+
+    #[allow(unused)]
+    #[inline(always)]
     fn get_size(&self) -> (usize, usize) {
         Self::get_size_type()
     }
+    #[allow(unused)]
+    #[inline(always)]
     fn get_size_type() -> (usize, usize) {
         (H, W)
     }

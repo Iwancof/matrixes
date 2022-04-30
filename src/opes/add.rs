@@ -1,4 +1,4 @@
-use crate::Matrix;
+use crate::{Matrix, TMatrix};
 
 use std::ops::Add;
 impl<const H: usize, const W: usize, InnerLeft, InnerRight, InnerOut> Add<Matrix<H, W, InnerRight>>
