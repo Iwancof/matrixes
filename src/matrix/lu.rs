@@ -80,6 +80,7 @@ macro_rules! create_unit_lu_struct {
                 [(); S]:,
                 $type: std::ops::Add<Output = $type> + Copy + Clone + Default,
             {
+                use num_traits::identities::One;
                 Self {
                     e: (l + u - Matrix::<S, S, $type>::one()).get(),
                     ipiv,

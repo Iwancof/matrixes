@@ -7,7 +7,6 @@ mod solve;
 
 mod matrix;
 mod opes;
-mod regular;
 
 extern crate openblas_src;
 
@@ -23,6 +22,4 @@ fn main() {
 
     let x = solve!(a times ? = b_1 + b_2).unwrap();
     println!("{}", x);
-
-    let ans = Matrix::new([[5., 8., 1.], [7., 9., 0.]]);
 }

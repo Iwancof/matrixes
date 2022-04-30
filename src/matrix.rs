@@ -1,4 +1,6 @@
 pub mod lu;
+pub mod regular;
+pub mod tridiagonal;
 
 use std::default::Default;
 
@@ -10,30 +12,57 @@ pub struct Matrix<const H: usize, const W: usize, Inner> {
 }
 
 pub trait TMatrix<const H: usize, const W: usize, Inner> {
-    fn get_size(&self) -> (usize, usize);
+    fn at(&self, row: usize, col: usize) -> Inner
+    where
+        Inner: Clone;
+
     fn is_regular(&self) -> bool {
         self.get_size().0 == self.get_size().1
     }
-    fn get_size_type() -> (usize, usize);
-
-    fn inner(&self) -> &[[Inner; H]; W];
-    fn inner_mut(&mut self) -> &mut [[Inner; H]; W];
-
-    fn as_ptr(&self) -> *const Inner {
-        self.inner().as_ptr() as _
+    fn get_size(&self) -> (usize, usize) {
+        (H, W)
     }
-    fn as_mut_ptr(&mut self) -> *mut Inner {
-        self.inner_mut().as_mut_ptr() as _
-    }
-    fn at(&self, row: usize, col: usize) -> &Inner {
-        &self.inner()[col][row]
-    }
-    fn at_mut(&mut self, row: usize, col: usize) -> &mut Inner {
-        &mut self.inner_mut()[col][row]
+    fn get_size_type() -> (usize, usize) {
+        (H, W)
     }
 }
 
+fn equal_using_at<const H: usize, const W: usize, Inner, T, U>(a: &T, b: &U) -> bool
+where
+    Inner: PartialEq + Clone,
+    T: TMatrix<H, W, Inner>,
+    U: TMatrix<H, W, Inner>,
+{
+    let (h, w) = a.get_size();
+    for i in 0..h {
+        for j in 0..w {
+            if a.at(i, j) != b.at(i, j) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 impl<const H: usize, const W: usize, Inner> Matrix<H, W, Inner> {
+    #[inline(always)]
+    #[allow(unused)]
+    pub fn at_mut(&mut self, row: usize, col: usize) -> &mut Inner {
+        &mut self.e[col][row]
+    }
+    pub fn inner(&self) -> &[[Inner; H]; W] {
+        &self.e
+    }
+    pub fn inner_mut(&mut self) -> &mut [[Inner; H]; W] {
+        &mut self.e
+    }
+    pub fn as_ptr(&self) -> *const Inner {
+        self.inner() as *const _ as *const Inner
+    }
+    pub fn as_mut_ptr(&mut self) -> *mut Inner {
+        self.inner_mut() as *mut _ as *mut Inner
+    }
+
     #[inline(always)]
     #[allow(unused)]
     pub const fn by(v: Inner) -> Self
@@ -81,55 +110,25 @@ where
 impl<const H: usize, const W: usize, Inner> TMatrix<H, W, Inner> for Matrix<H, W, Inner> {
     #[allow(unused)]
     #[inline(always)]
-    fn inner(&self) -> &[[Inner; H]; W] {
-        &self.e
-    }
-    #[allow(unused)]
-    #[inline(always)]
-    fn inner_mut(&mut self) -> &mut [[Inner; H]; W] {
-        &mut self.e
-    }
-
-    #[allow(unused)]
-    #[inline(always)]
-    fn get_size(&self) -> (usize, usize) {
-        Self::get_size_type()
-    }
-    #[allow(unused)]
-    #[inline(always)]
-    fn get_size_type() -> (usize, usize) {
-        (H, W)
+    fn at(&self, row: usize, col: usize) -> Inner
+    where
+        Inner: Clone,
+    {
+        self.e[col][row].clone()
     }
 }
-
-macro_rules! create_util_const_matrixes {
-    ($type: ty) => {
-        impl<const S: usize> Matrix<S, S, $type> {
-            #[inline(always)]
-            #[allow(unused)]
-            pub fn one() -> Self {
-                Self::by_f(|col, row| if col == row { 1 as $type } else { 0 as $type })
-            }
-        }
-    };
-}
-
-create_util_const_matrixes!(i32);
-create_util_const_matrixes!(i64);
-create_util_const_matrixes!(f32);
-create_util_const_matrixes!(f64);
 
 use std::fmt::{Debug, Display};
 
 impl<const H: usize, const W: usize, Inner> Display for Matrix<H, W, Inner>
 where
-    Inner: Display,
+    Inner: Display + Clone,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let (h, w) = self.get_size();
         for y in 0..h {
             for x in 0..w {
-                write!(f, "{:5}, ", self.at(y, x))?;
+                write!(f, "{:5}, ", self.at(y, x).clone())?;
             }
             writeln!(f, "")?;
         }
@@ -139,14 +138,14 @@ where
 }
 impl<const H: usize, const W: usize, Inner> Debug for Matrix<H, W, Inner>
 where
-    Inner: Debug,
+    Inner: Debug + Clone,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let (h, w) = self.get_size();
         for y in 0..h {
             write!(f, "[")?;
             for x in 0..w {
-                write!(f, "{:5?}, ", self.at(y, x))?;
+                write!(f, "{:5?}, ", self.at(y, x).clone())?;
             }
             write!(f, "], ")?;
         }
@@ -170,7 +169,7 @@ where
         let (h, w) = self.get_size();
         for y in 0..h {
             for x in 0..w {
-                if !self.at(y, x).approx_eq(*other.at(y, x), margin) {
+                if !self.at(y, x).approx_eq(other.at(y, x), margin) {
                     return false;
                 }
             }
@@ -222,10 +221,10 @@ mod test {
         let mut m = Matrix::new([[1, 2], [3, 4]]);
         // 1 3
         // 2 4
-        assert_eq!(m.at(0, 0), &1);
-        assert_eq!(m.at(1, 0), &2);
-        assert_eq!(m.at(0, 1), &3);
-        assert_eq!(m.at(1, 1), &4);
+        assert_eq!(m.at(0, 0), 1);
+        assert_eq!(m.at(1, 0), 2);
+        assert_eq!(m.at(0, 1), 3);
+        assert_eq!(m.at(1, 1), 4);
 
         *m.at_mut(1, 1) += 100;
 
