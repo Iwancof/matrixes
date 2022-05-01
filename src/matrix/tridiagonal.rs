@@ -1,3 +1,5 @@
+pub mod lu;
+
 use super::regular::TRegularMatrix;
 use super::{equal_using_at, Matrix, TMatrix};
 use std::convert::{TryFrom, TryInto};

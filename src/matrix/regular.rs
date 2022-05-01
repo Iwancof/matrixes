@@ -1,4 +1,5 @@
-use crate::matrix::lu;
+pub mod lu;
+
 use crate::{Matrix, TMatrix};
 
 #[derive(Debug, Clone, Copy)]

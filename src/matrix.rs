@@ -1,4 +1,3 @@
-pub mod lu;
 pub mod regular;
 pub mod tridiagonal;
 
@@ -128,7 +127,7 @@ where
         let (h, w) = self.get_size();
         for y in 0..h {
             for x in 0..w {
-                write!(f, "{:5}, ", self.at(y, x).clone())?;
+                write!(f, "{:20}, ", self.at(y, x).clone())?;
             }
             writeln!(f, "")?;
         }

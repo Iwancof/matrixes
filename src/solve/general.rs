@@ -1,3 +1,4 @@
+use crate::matrix::regular::lu;
 use crate::{Matrix, TMatrix};
 
 use super::{AXEqBError, TAXEqB};
@@ -80,7 +81,6 @@ macro_rules! create_solve_ax_b_imple {
 create_solve_ax_b_imple!(sgesv_, f32);
 create_solve_ax_b_imple!(dgesv_, f64); // TODO: better? dgetsvx
 
-use crate::matrix::lu;
 impl<const AH: usize, const AWXH: usize, const XW: usize, InnerA, InnerX, InnerB>
     TAXEqB<AH, AWXH, XW, InnerA, InnerX, InnerB>
     for (lu::FactorizeLU<AH, AWXH, InnerA>, Matrix<AH, XW, InnerB>)
@@ -151,10 +151,8 @@ mod test {
 
     #[test]
     fn solve_ax_b_by_lu_f32() {
-        use crate::matrix::lu::FactorizeLU;
+        use crate::matrix::regular::lu::{FactorizeLU, TFactorizeLU};
         use float_cmp::{ApproxEq, F32Margin};
-
-        use lu::TFactorizeLU;
 
         let a = Matrix::new([[3., 2., 1.], [4., 5., 3.], [1., 6., 3.]]);
         let b = Matrix::new([[48., 56., 32.], [57., 59., 34.]]);
@@ -179,10 +177,10 @@ mod test {
 
     #[test]
     fn solve_ax_b_by_lu_f64() {
-        use crate::matrix::lu::FactorizeLU;
+        use crate::matrix::regular::lu::{FactorizeLU, TFactorizeLU};
         use float_cmp::{ApproxEq, F64Margin};
 
-        use lu::TFactorizeLU;
+        // use lu::TFactorizeLU;
 
         let a = Matrix::new([[3., 2., 1.], [4., 5., 3.], [1., 6., 3.]]);
         let b = Matrix::new([[48., 56., 32.], [57., 59., 34.]]);
