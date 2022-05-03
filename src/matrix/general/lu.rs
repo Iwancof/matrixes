@@ -9,6 +9,20 @@ pub const fn min(a: usize, b: usize) -> usize {
     }
 }
 
+#[derive(Debug)]
+pub struct GeneralLuPivot<const S: usize> {
+    pub pivot: [i32; S],
+    // pub pivot: i32,
+}
+
+impl<const S: usize> Default for GeneralLuPivot<S> {
+    fn default() -> Self {
+        Self { pivot: [0; S] }
+        // Self { pivot: 0 }
+    }
+}
+
+#[derive(Debug)]
 pub struct GeneralLuFormat<const H: usize, const W: usize, Inner, Pivot>
 // where
 // [(); min(H, W)]:,
@@ -20,6 +34,9 @@ pub struct GeneralLuFormat<const H: usize, const W: usize, Inner, Pivot>
 
 impl<const H: usize, const W: usize, Inner, Pivot> lu::LuFormat<GeneralMatrix<H, W, Inner>, Pivot>
     for GeneralLuFormat<H, W, Inner, Pivot>
+where
+    Self: Sized,
+    Pivot: Default,
 {
     fn new_with(internal_matrix: GeneralMatrix<H, W, Inner>, pivot: Pivot) -> Self {
         Self {
@@ -50,6 +67,7 @@ impl<const H: usize, const W: usize, Inner, Pivot> lu::LuFormat<GeneralMatrix<H,
     }
 }
 
+#[derive(Debug)]
 pub struct GeneralLuError(i32);
 
 impl GeneralLuError {
@@ -71,12 +89,14 @@ impl lu::AsLuError for GeneralLuError {
     }
 }
 
-impl<const H: usize, const W: usize> lu::AsLu<H, W, f32, [i32; min(H, W)], GeneralLuError>
+impl<const H: usize, const W: usize>
+    lu::AsLu<H, W, f32, GeneralLuPivot<{ min(H, W) }>, GeneralLuError>
     for GeneralMatrix<H, W, f32>
 {
-    type Lu = GeneralLuFormat<H, W, f32, [i32; min(H, W)]>;
+    type Lu = GeneralLuFormat<H, W, f32, GeneralLuPivot<{ min(H, W) }>>;
 
     default fn fact_internal(dest: &mut Self::Lu) -> GeneralLuError {
+        /*
         #[link(name = "lapack")]
         extern "C" {
             fn sgetrf_(
@@ -88,8 +108,7 @@ impl<const H: usize, const W: usize> lu::AsLu<H, W, f32, [i32; min(H, W)], Gener
                 info: *mut i32,  // integer
             );
         }
-        use std::default::Default;
-        // let x: [i32; min(H, W)] = Default::default();
+        Self::Lu::test();
 
         let m: *const i32 = &(H as i32);
         let n: *const i32 = &(W as i32);
@@ -98,12 +117,15 @@ impl<const H: usize, const W: usize> lu::AsLu<H, W, f32, [i32; min(H, W)], Gener
         use lu::{AsLuError, LuFormat};
         let (mat, piv) = dest.data_mut();
         let mat = mat.inner_mut() as *mut _ as *mut f32;
-        let piv = piv.as_mut() as *mut _ as *mut i32;
+        let piv = &mut piv.pivot as *mut _ as *mut i32;
 
         let mut error = GeneralLuError::SUCCESS;
 
         unsafe { sgetrf_(m, n, mat, lda, piv, error.as_lapack_into_mut()) };
 
         error
+        */
+
+        todo!()
     }
 }

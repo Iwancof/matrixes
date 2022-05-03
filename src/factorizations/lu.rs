@@ -3,6 +3,7 @@ use crate::matrix::AsMatrix;
 pub trait LuFormat<Base, Pivot>
 where
     Self: Sized,
+    Pivot: Default,
 {
     // require methods
     fn new_with(mt: Base, pivot: Pivot) -> Self;
@@ -23,6 +24,10 @@ where
     {
         Self::new_with_box(mt, Default::default())
     }
+
+    fn test() {
+        println!("It works!");
+    }
 }
 
 pub trait AsLuError {
@@ -40,6 +45,7 @@ where
     // Pivot: Default,
     Self: AsMatrix<H, W, Inner> + Sized,
     LuError: AsLuError,
+    Pivot: Default,
 {
     type Lu: LuFormat<Self, Pivot>;
 
@@ -51,13 +57,30 @@ where
     where
         Pivot: Default,
     {
-        let mut dest = Self::Lu::new(self); // consume self here. so no more memory needed.
+        // let mut dest = Self::Lu::new(self); // consume self here. so no more memory needed.
+        // Self::Lu::test();
+        // print_typename(Self::Lu::test);
+        // println!("It works");
+        // work();
+        // Self::Lu::test();
+        Self::Lu::new(self);
+        // let t = <Self as AsLu<H, W, Inner, Pivot, LuError>>::Lu::test;
+        // <Self::Lu as LuFormat<Self, Pivot>>::test();
+        // t();
+        // print_typename(1);
+        // print_typename(t);
+
+        todo!();
+        /*
+        let p = Pivot::default();
+        let mut dest = Self::Lu::new_with(self, p);
         let err = Self::fact_internal(&mut dest);
         if err.is_error() {
             Err(err)
         } else {
             Ok(dest)
         }
+        */
     }
     fn lu_box(self: Box<Self>) -> Result<Box<Self::Lu>, LuError>
     where
@@ -71,4 +94,12 @@ where
             Ok(dest)
         }
     }
+}
+
+pub fn work() {
+    println!("It works!");
+}
+
+fn print_typename<T>(_: T) {
+    println!("{}", std::any::type_name::<T>());
 }
