@@ -32,22 +32,23 @@ pub struct TestLu<const H: usize, const W: usize, Inner, Piv> {
     inner: GeneralMatrix<H, W, Inner>,
     p: Piv,
 }
-impl<const H: usize, const W: usize, Pivot>
-    crate::factorizations::lu::LuFormat<GeneralMatrix<H, W, f64>, Pivot>
-    for TestLu<H, W, f64, Pivot>
+
+impl<const H: usize, const W: usize>
+    crate::factorizations::lu::LuFormat<GeneralMatrix<H, W, f64>, MyPivot<{ m(H, W) }>>
+    for TestLu<H, W, f64, MyPivot<{ m(H, W) }>>
 where
-    Pivot: Default,
+    MyPivot<{ m(H, W) }>: Default,
 {
-    fn new_with(mt: GeneralMatrix<H, W, f64>, pivot: Pivot) -> Self {
+    fn new_with(mt: GeneralMatrix<H, W, f64>, pivot: MyPivot<{ m(H, W) }>) -> Self {
         todo!()
     }
-    fn new_with_box(mt: Box<GeneralMatrix<H, W, f64>>, pivot: Pivot) -> Box<Self> {
+    fn new_with_box(mt: Box<GeneralMatrix<H, W, f64>>, pivot: MyPivot<{ m(H, W) }>) -> Box<Self> {
         todo!()
     }
-    fn data_ref(&self) -> (&GeneralMatrix<H, W, f64>, &Pivot) {
+    fn data_ref(&self) -> (&GeneralMatrix<H, W, f64>, &MyPivot<{ m(H, W) }>) {
         todo!()
     }
-    fn data_mut(&mut self) -> (&mut GeneralMatrix<H, W, f64>, &mut Pivot) {
+    fn data_mut(&mut self) -> (&mut GeneralMatrix<H, W, f64>, &mut MyPivot<{ m(H, W) }>) {
         todo!()
     }
 }
@@ -76,9 +77,12 @@ fn main() {
     use factorizations::lu::{AsLu, LuFormat};
     use num_traits::Zero;
 
-    let m2 = GeneralMatrix::new_row_major([[10., 10., 10.], [10., 10., 10.], [10., 10., 10.]]);
+    let m2: GeneralMatrix<3, 3, f32> =
+        GeneralMatrix::new_row_major([[10., 10., 10.], [10., 10., 10.], [10., 10., 10.]]);
     m2.lu();
-    // let m2 = GeneralMatrix::new_row_major([[10., 10., 10.], [10., 10., 10.], [10., 10., 10.]]);
+
+    // let m2: GeneralMatrix<3, 3, f64> =
+    //     GeneralMatrix::new_row_major([[10., 10., 10.], [10., 10., 10.], [10., 10., 10.]]);
     // m2.lu();
 
     /*

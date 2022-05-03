@@ -63,24 +63,19 @@ where
         // println!("It works");
         // work();
         // Self::Lu::test();
-        Self::Lu::new(self);
         // let t = <Self as AsLu<H, W, Inner, Pivot, LuError>>::Lu::test;
         // <Self::Lu as LuFormat<Self, Pivot>>::test();
         // t();
         // print_typename(1);
         // print_typename(t);
 
-        todo!();
-        /*
-        let p = Pivot::default();
-        let mut dest = Self::Lu::new_with(self, p);
+        let mut dest = Self::Lu::new(self);
         let err = Self::fact_internal(&mut dest);
         if err.is_error() {
             Err(err)
         } else {
             Ok(dest)
         }
-        */
     }
     fn lu_box(self: Box<Self>) -> Result<Box<Self::Lu>, LuError>
     where

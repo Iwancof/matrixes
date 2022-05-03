@@ -9,7 +9,7 @@ pub const fn min(a: usize, b: usize) -> usize {
     }
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct GeneralLuPivot<const S: usize> {
     pub pivot: [i32; S],
     // pub pivot: i32,
@@ -32,19 +32,25 @@ pub struct GeneralLuFormat<const H: usize, const W: usize, Inner, Pivot>
     pivot: Pivot,
 }
 
-impl<const H: usize, const W: usize, Inner, Pivot> lu::LuFormat<GeneralMatrix<H, W, Inner>, Pivot>
-    for GeneralLuFormat<H, W, Inner, Pivot>
+impl<const H: usize, const W: usize>
+    lu::LuFormat<GeneralMatrix<H, W, f32>, GeneralLuPivot<{ min(H, W) }>>
+    for GeneralLuFormat<H, W, f32, GeneralLuPivot<{ min(H, W) }>>
 where
     Self: Sized,
-    Pivot: Default,
 {
-    fn new_with(internal_matrix: GeneralMatrix<H, W, Inner>, pivot: Pivot) -> Self {
+    fn new_with(
+        internal_matrix: GeneralMatrix<H, W, f32>,
+        pivot: GeneralLuPivot<{ min(H, W) }>,
+    ) -> Self {
         Self {
             internal_matrix,
             pivot,
         }
     }
-    fn new_with_box(mt: Box<GeneralMatrix<H, W, Inner>>, pivot: Pivot) -> Box<Self> {
+    fn new_with_box(
+        mt: Box<GeneralMatrix<H, W, f32>>,
+        pivot: GeneralLuPivot<{ min(H, W) }>,
+    ) -> Box<Self> {
         let mut make = Box::new_uninit();
 
         unsafe {
@@ -59,10 +65,15 @@ where
 
         unsafe { make.assume_init() }
     }
-    fn data_ref(&self) -> (&GeneralMatrix<H, W, Inner>, &Pivot) {
+    fn data_ref(&self) -> (&GeneralMatrix<H, W, f32>, &GeneralLuPivot<{ min(H, W) }>) {
         (&self.internal_matrix, &self.pivot)
     }
-    fn data_mut(&mut self) -> (&mut GeneralMatrix<H, W, Inner>, &mut Pivot) {
+    fn data_mut(
+        &mut self,
+    ) -> (
+        &mut GeneralMatrix<H, W, f32>,
+        &mut GeneralLuPivot<{ min(H, W) }>,
+    ) {
         (&mut self.internal_matrix, &mut self.pivot)
     }
 }
@@ -96,7 +107,6 @@ impl<const H: usize, const W: usize>
     type Lu = GeneralLuFormat<H, W, f32, GeneralLuPivot<{ min(H, W) }>>;
 
     default fn fact_internal(dest: &mut Self::Lu) -> GeneralLuError {
-        /*
         #[link(name = "lapack")]
         extern "C" {
             fn sgetrf_(
@@ -124,8 +134,5 @@ impl<const H: usize, const W: usize>
         unsafe { sgetrf_(m, n, mat, lda, piv, error.as_lapack_into_mut()) };
 
         error
-        */
-
-        todo!()
     }
 }
