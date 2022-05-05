@@ -9,9 +9,9 @@ pub const fn min(a: usize, b: usize) -> usize {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct GeneralLuPivot<const S: usize> {
-    pivot: [i32; S],
+    pub pivot: [i32; S],
     // pub pivot: i32,
 }
 
@@ -22,7 +22,7 @@ impl<const S: usize> Default for GeneralLuPivot<S> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct GeneralLuFormat<const H: usize, const W: usize, Inner, Pivot>
 where
     Inner: Clone, // where
@@ -31,6 +31,50 @@ where
     pub internal_matrix: GeneralMatrix<H, W, Inner>,
     // pivot: [i32; min(H, W)],
     pub pivot: Pivot,
+}
+
+impl<const H: usize, const W: usize, Inner, Pivot> GeneralLuFormat<H, W, Inner, Pivot>
+where
+    Inner: Clone,
+{
+    pub fn new(matrix: GeneralMatrix<H, W, Inner>, pivot: Pivot) -> Self {
+        Self {
+            internal_matrix: matrix,
+            pivot,
+        }
+    }
+}
+impl<const S: usize, Inner, Pivot> GeneralLuFormat<S, S, Inner, Pivot>
+where
+    Inner: Clone,
+{
+    pub fn from_l_u(
+        l: GeneralMatrix<S, S, Inner>,
+        u: GeneralMatrix<S, S, Inner>,
+        pivot: Pivot,
+    ) -> Self
+    where
+        Inner: Copy
+            + Clone
+            + num_traits::Zero
+            + num_traits::One
+            + std::ops::SubAssign
+            + std::ops::AddAssign
+            + std::ops::Add,
+    {
+        use num_traits::One;
+        println!("Reimplement with sub!");
+        let mut internal = l + u; // - GeneralMatrix::one();
+
+        for i in 0..S {
+            *internal.at_mut(i, i) -= Inner::one();
+        }
+
+        Self {
+            internal_matrix: internal,
+            pivot,
+        }
+    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -159,3 +203,55 @@ macro_rules! impl_macro {
 
 impl_macro!(sgetrf, f32);
 impl_macro!(dgetrf, f64);
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::factorizations::lu::{AsLu, AsLuError};
+
+    #[test]
+    fn factorize_lu_f32() {
+        let m = GeneralMatrix::new_col_major([[2. as f32, 4.], [9., 4.]]);
+
+        let l = GeneralMatrix::new_col_major([[1., 0.5], [0., 1.]]);
+        let u = GeneralMatrix::new_col_major([[4., 0.], [4., 7.]]);
+        let piv = GeneralLuPivot { pivot: [2, 2] };
+
+        let ans = GeneralLuFormat::from_l_u(l, u, piv);
+
+        let result = m.lu();
+        let result = result.expect("factorization failed");
+
+        let (matrix, error): (
+            GeneralLuFormat<2, 2, f32, GeneralLuPivot<2>>,
+            GeneralLuError,
+        ) = result;
+
+        assert!(!error.is_error());
+
+        assert_eq!(matrix, ans);
+    }
+
+    #[test]
+    fn factorize_lu_f64() {
+        let m = GeneralMatrix::new_col_major([[2. as f64, 4.], [9., 4.]]);
+
+        let l = GeneralMatrix::new_col_major([[1., 0.5], [0., 1.]]);
+        let u = GeneralMatrix::new_col_major([[4., 0.], [4., 7.]]);
+        let piv = GeneralLuPivot { pivot: [2, 2] };
+
+        let ans = GeneralLuFormat::from_l_u(l, u, piv);
+
+        let result = m.lu();
+        let result = result.expect("factorization failed");
+
+        let (matrix, error): (
+            GeneralLuFormat<2, 2, f64, GeneralLuPivot<2>>,
+            GeneralLuError,
+        ) = result;
+
+        assert!(!error.is_error());
+
+        assert_eq!(matrix, ans);
+    }
+}

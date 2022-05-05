@@ -8,8 +8,8 @@ impl<const LH: usize, const LWRH: usize, const RW: usize, InnerLeft, InnerRight,
     Mul<GeneralMatrix<LWRH, RW, InnerRight>> for GeneralMatrix<LH, LWRH, InnerLeft>
 where
     InnerOut: Zero + Copy + AddAssign,
-    InnerLeft: Clone + Mul<InnerRight, Output = InnerOut>,
-    InnerRight: Clone,
+    InnerLeft: Zero + Clone + Mul<InnerRight, Output = InnerOut>,
+    InnerRight: Zero + Clone,
 {
     // Matrix(LH*LW) * Matrix(LW*RW)
     type Output = GeneralMatrix<LH, RW, InnerOut>;
@@ -38,8 +38,7 @@ macro_rules! impl_macro {
                 alpha: $type,
                 beta: $type,
             ) {
-                extern "C" {
-                    fn [<$lapack _>](
+                extern "C" { fn [<$lapack _>](
                         // C = alpha * A * B + beta * C
                         trans_mode_a: *const i8,
                         trans_mode_b: *const i8,

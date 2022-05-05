@@ -2,9 +2,10 @@ pub mod add;
 pub mod lu;
 pub mod mul;
 
-use super::AsMatrix;
+use super::{print_matrix_display, AsMatrix};
 
 use num_traits::{One, Zero};
+use once_cell::sync::Lazy;
 
 use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter, Result};
@@ -54,30 +55,29 @@ where
     }
 }
 
+impl<const S: usize, Inner> One for GeneralMatrix<S, S, Inner>
+where
+    Inner: Zero + One + Clone + AddAssign + Copy,
+{
+    fn one() -> Self {
+        use array_macro::array;
+
+        Self {
+            #[cfg(feature = "on_heap")]
+            inner: box array![x => array![y => if x == y { Inner::one() } else { Inner::zero() }; S]; S],
+
+            #[cfg(not(feature = "on_heap"))]
+            inner: array![x => array![y => if x == y { Inner::one() } else { Inner::zero() }; S], S],
+        }
+    }
+}
+
 impl<const H: usize, const W: usize, Inner> Display for GeneralMatrix<H, W, Inner>
 where
     Inner: Clone + Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        if let Some(width) = f.width() {
-            for h in 0..H {
-                for w in 0..W {
-                    // write!(f, "{1:.*}", precision, self.inner[w][h])?;
-                    write!(f, "{:width$}", self.inner[w][h], width = width)?;
-                }
-                writeln!(f)?;
-            }
-        } else {
-            for h in 0..H {
-                for w in 0..W {
-                    write!(f, "{}", self.inner[w][h])?;
-                    // write!(f, self.inner[w][h])?;
-                }
-                writeln!(f)?;
-            }
-        }
-
-        Ok(())
+        print_matrix_display(self, f)
     }
 }
 
@@ -336,5 +336,21 @@ mod tests {
             GeneralMatrix::new_row_major([[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9]]);
 
         assert_eq!(mat, ans);
+    }
+
+    #[test]
+    fn test_zero() {
+        let x = GeneralMatrix::zero();
+        let ans = GeneralMatrix::new_row_major([[0; 4]; 4]);
+
+        assert_eq!(x, ans);
+    }
+
+    #[test]
+    fn test_one() {
+        let x = GeneralMatrix::one();
+        let ans = GeneralMatrix::<4, 4, i32>::by_f(|x, y| if x == y { 1 } else { 0 });
+
+        assert_eq!(x, ans);
     }
 }
