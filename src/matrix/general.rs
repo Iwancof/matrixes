@@ -10,13 +10,22 @@ use std::cmp::PartialEq;
 use std::fmt::{Display, Formatter, Result};
 use std::ops::{Add, AddAssign};
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct GeneralMatrix<const H: usize, const W: usize, Inner> {
+#[derive(Debug, Clone, PartialEq)]
+pub struct GeneralMatrix<const H: usize, const W: usize, Inner>
+where
+    Inner: Clone,
+{
+    #[cfg(feature = "on_heap")]
+    inner: Box<[[Inner; H]; W]>,
+
+    #[cfg(not(feature = "on_heap"))]
     inner: [[Inner; H]; W],
 }
 
-impl<const H: usize, const W: usize, Inner> AsMatrix<H, W, Inner> for GeneralMatrix<H, W, Inner> {
+impl<const H: usize, const W: usize, Inner> AsMatrix<H, W, Inner> for GeneralMatrix<H, W, Inner>
+where
+    Inner: Clone,
+{
     fn at(&self, row: usize, col: usize) -> &Inner {
         &self.inner[col][row]
     }
@@ -30,6 +39,10 @@ where
         use array_macro::array;
 
         Self {
+            #[cfg(feature = "on_heap")]
+            inner: box array![_ => array![_ => Inner::zero(); H]; W],
+
+            #[cfg(not(feature = "on_heap"))]
             inner: array![_ => array![_ => Inner::zero(); H]; W],
         }
     }
@@ -43,7 +56,7 @@ where
 
 impl<const H: usize, const W: usize, Inner> Display for GeneralMatrix<H, W, Inner>
 where
-    Inner: Display,
+    Inner: Clone + Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if let Some(width) = f.width() {
@@ -68,7 +81,10 @@ where
     }
 }
 
-impl<const H: usize, const W: usize, Inner> GeneralMatrix<H, W, Inner> {
+impl<const H: usize, const W: usize, Inner> GeneralMatrix<H, W, Inner>
+where
+    Inner: Clone,
+{
     #[inline]
     #[allow(unused)]
     pub fn at_mut(&mut self, row: usize, col: usize) -> &mut Inner {
@@ -92,12 +108,13 @@ impl<const H: usize, const W: usize, Inner> GeneralMatrix<H, W, Inner> {
 
     #[inline]
     #[allow(unused)]
-    pub fn by(v: Inner) -> Self
-    where
-        Inner: Clone,
-    {
+    pub fn by(v: Inner) -> Self {
         use array_macro::array;
         Self {
+            #[cfg(feature = "on_heap")]
+            inner: box array![_ => array![_ => v.clone(); H]; W],
+
+            #[cfg(not(feature = "on_heap"))]
             inner: array![array![v.clone(); H]; W],
         }
     }
@@ -105,12 +122,99 @@ impl<const H: usize, const W: usize, Inner> GeneralMatrix<H, W, Inner> {
     #[inline]
     #[allow(unused)]
     pub fn by_f(f: impl Fn(usize, usize) -> Inner) -> Self {
-        use array_macro::array;
+        #[cfg(feature = "on_heap")]
+        {
+            let mut inner = Box::<[[Inner; H]; W]>::new_uninit();
+            let ptr = inner.as_mut_ptr() as *mut Inner;
+            for h in 0..H {
+                for w in 0..W {
+                    unsafe {
+                        // (*inner.as_mut_ptr())[w][h] = f(w, h);
+                        ptr.add(w * H + h).write(f(w, h));
+                    }
+                }
+            }
+            Self {
+                inner: unsafe { inner.assume_init() },
+            }
+        }
+        #[cfg(not(feature = "on_heap"))]
+        {
+            use array_macro::array;
+            Self {
+                inner: array![x => array![y => f(x, y); H]; W],
+            }
+        }
+    }
+}
+
+#[cfg(feature = "on_heap")]
+impl<const H: usize, const W: usize, Inner> GeneralMatrix<H, W, Inner>
+where
+    Inner: Clone,
+{
+    #[inline]
+    #[allow(unused)]
+    pub fn new_col_major(inner: [[Inner; H]; W]) -> Self {
         Self {
-            inner: array![x => array![y => f(y, x); H]; W],
+            inner: Box::new(inner),
         }
     }
 
+    #[inline]
+    #[allow(unused)]
+    pub const fn new_col_major_box(inner: Box<[[Inner; H]; W]>) -> Self {
+        Self { inner }
+    }
+
+    #[inline]
+    #[allow(unused)]
+    pub fn new_row_major(v: [[Inner; W]; H]) -> Self {
+        use core::mem::MaybeUninit;
+
+        let mut heap: Box<MaybeUninit<[[Inner; H]; W]>> = Box::new_uninit();
+        let ptr = heap.as_mut_ptr() as *mut Inner;
+
+        for h in 0..H {
+            for w in 0..W {
+                unsafe {
+                    ptr.add(w * H + h).write(v[h][w].clone());
+                }
+            }
+        }
+
+        Self {
+            inner: unsafe { heap.assume_init() },
+        }
+    }
+
+    #[inline]
+    #[allow(unused)]
+    pub fn new_row_major_box(v: Box<[[Inner; W]; H]>) -> Self {
+        use core::mem::{forget, transmute_copy, MaybeUninit};
+
+        let mut heap: Box<MaybeUninit<[[Inner; H]; W]>> = Box::new_uninit();
+        let ptr = heap.as_mut_ptr() as *mut Inner;
+
+        for h in 0..H {
+            for w in 0..W {
+                unsafe {
+                    ptr.add(w * H + h).write(v[h][w].clone());
+                }
+            }
+        }
+
+        Self {
+            inner: unsafe { heap.assume_init() },
+        }
+    }
+}
+
+#[cfg(not(feature = "on_heap"))]
+impl<const H: usize, const W: usize, Inner> GeneralMatrix<H, W, Inner>
+where
+    Inner: Clone,
+{
     #[inline]
     #[allow(unused)]
     pub const fn new_col_major(inner: [[Inner; H]; W]) -> Self {
@@ -120,6 +224,7 @@ impl<const H: usize, const W: usize, Inner> GeneralMatrix<H, W, Inner> {
     #[inline]
     #[allow(unused)]
     pub fn new_row_major(v: [[Inner; W]; H]) -> Self {
+        println!("todo! reimplement");
         use core::mem::{forget, transmute_copy, MaybeUninit};
 
         let mut inner: MaybeUninit<[[Inner; H]; W]> = MaybeUninit::uninit();
@@ -160,7 +265,7 @@ mod tests {
     }
 
     #[test]
-    fn row_major() {
+    fn row_major_only() {
         let m = GeneralMatrix::new_row_major([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
         assert_eq!(m.at(0, 0), &1);
         assert_eq!(m.at(0, 1), &2);
@@ -174,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn row_major_not_regular() {
+    fn row_major_not_regular_stack() {
         let m = GeneralMatrix::new_row_major([[1, 2, 3, 4], [5, 6, 7, 8]]);
         let ans = GeneralMatrix::new_col_major([[1, 5], [2, 6], [3, 7], [4, 8]]);
         assert_eq!(m, ans);
@@ -195,8 +300,6 @@ mod tests {
         ]);
 
         assert_eq!(m, ans);
-
-        // if implementation broken, this will print 'free(): double free detected in tcache 2'
     }
 
     #[test]
@@ -228,9 +331,9 @@ mod tests {
 
     #[test]
     fn test_construct_by_f() {
-        let mat = GeneralMatrix::by_f(|x, y| x + y);
+        let mat = GeneralMatrix::by_f(|x, y| x + 2 * y);
         let ans =
-            GeneralMatrix::new_row_major([[0, 1, 2, 3], [1, 2, 3, 4], [2, 3, 4, 5], [3, 4, 5, 6]]);
+            GeneralMatrix::new_row_major([[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9]]);
 
         assert_eq!(mat, ans);
     }

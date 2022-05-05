@@ -5,6 +5,7 @@ use std::ops::Add;
 impl<const H: usize, const W: usize, InnerLeft, InnerRight, InnerOut>
     Add<GeneralMatrix<H, W, InnerRight>> for GeneralMatrix<H, W, InnerLeft>
 where
+    InnerOut: Clone,
     InnerRight: Clone,
     InnerLeft: Add<InnerRight, Output = InnerOut> + Clone,
 {

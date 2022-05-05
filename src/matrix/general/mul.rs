@@ -92,22 +92,22 @@ macro_rules! impl_macro {
                     );
                 }
             }
+impl<const LH: usize, const LWRH: usize, const RW: usize> Mul<GeneralMatrix<LWRH, RW, $type>>
+    for GeneralMatrix<LH, LWRH, $type>
+{
+    fn mul(self, lhs: GeneralMatrix<LWRH, RW, $type>) -> Self::Output {
+        let mut ret = GeneralMatrix::zero();
+        concat_idents!(general_matrix_mul_, $lapack)(&self, &lhs, &mut ret, 1.0, 0.0);
+        ret
+    }
+}
+
         }
     }
 }
 
 impl_macro!(sgemm, f32);
 impl_macro!(dgemm, f64);
-
-impl<const LH: usize, const LWRH: usize, const RW: usize> Mul<GeneralMatrix<LWRH, RW, f32>>
-    for GeneralMatrix<LH, LWRH, f32>
-{
-    fn mul(self, lhs: GeneralMatrix<LWRH, RW, f32>) -> Self::Output {
-        let mut ret = GeneralMatrix::zero();
-        general_matrix_mul_sgemm(&self, &lhs, &mut ret, 1.0, 0.0);
-        ret
-    }
-}
 
 #[cfg(test)]
 mod tests {

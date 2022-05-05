@@ -3,127 +3,46 @@
 #![feature(generic_const_exprs)]
 #![feature(specialization)]
 #![feature(concat_idents)]
+#![feature(box_syntax)]
 
 pub mod factorizations;
 pub mod matrix;
 
 use matrix::general::lu::{self, GeneralLuError, GeneralLuFormat, GeneralLuPivot};
 use matrix::general::GeneralMatrix;
-
-const fn m(a: usize, b: usize) -> usize {
-    if a < b {
-        a
-    } else {
-        b
-    }
-}
-
-pub struct MyPivot<const A: usize> {
-    i: [i32; A],
-}
-
-impl<const A: usize> Default for MyPivot<A> {
-    fn default() -> Self {
-        Self { i: [0; A] }
-    }
-}
-
-pub struct TestLu<const H: usize, const W: usize, Inner, Piv> {
-    inner: GeneralMatrix<H, W, Inner>,
-    p: Piv,
-}
-
-impl<const H: usize, const W: usize>
-    crate::factorizations::lu::LuFormat<GeneralMatrix<H, W, f64>, MyPivot<{ m(H, W) }>>
-    for TestLu<H, W, f64, MyPivot<{ m(H, W) }>>
-where
-    MyPivot<{ m(H, W) }>: Default,
-{
-    fn new_with(mt: GeneralMatrix<H, W, f64>, pivot: MyPivot<{ m(H, W) }>) -> Self {
-        todo!()
-    }
-    fn new_with_box(mt: Box<GeneralMatrix<H, W, f64>>, pivot: MyPivot<{ m(H, W) }>) -> Box<Self> {
-        todo!()
-    }
-    fn data_ref(&self) -> (&GeneralMatrix<H, W, f64>, &MyPivot<{ m(H, W) }>) {
-        todo!()
-    }
-    fn data_mut(&mut self) -> (&mut GeneralMatrix<H, W, f64>, &mut MyPivot<{ m(H, W) }>) {
-        todo!()
-    }
-}
-
-impl<const H: usize, const W: usize>
-    crate::factorizations::lu::AsLu<H, W, f64, MyPivot<{ m(H, W) }>, GeneralLuError>
-    for GeneralMatrix<H, W, f64>
-{
-    type Lu = TestLu<H, W, f64, MyPivot<{ m(H, W) }>>;
-
-    default fn fact_internal(dest: &mut Self::Lu) -> GeneralLuError {
-        #[link(name = "lapack")]
-        extern "C" {
-            fn aa();
-        }
-
-        unsafe {
-            aa();
-        }
-
-        todo!()
-    }
-}
+use matrix::AsMatrix;
 
 fn main() {
     use factorizations::lu::{AsLu, LuFormat};
-    use num_traits::Zero;
+    use rand::Rng;
+    use std::time::Instant;
 
-    let m2: GeneralMatrix<3, 3, f32> =
-        GeneralMatrix::new_row_major([[10., 10., 10.], [10., 10., 10.], [10., 10., 10.]]);
-    m2.lu();
+    let mut rng = rand::thread_rng();
 
-    // let m2: GeneralMatrix<3, 3, f64> =
-    //     GeneralMatrix::new_row_major([[10., 10., 10.], [10., 10., 10.], [10., 10., 10.]]);
-    // m2.lu();
+    const SIZE: usize = 100;
+    let mut inner: Box<[[f64; SIZE]; SIZE]> = box [[0.0; SIZE]; SIZE];
+    for i in 0..SIZE {
+        for j in 0..SIZE {
+            inner[i][j] = rng.gen();
+        }
+    }
+    let x = GeneralMatrix::new_col_major_box(inner);
+    println!("Generated");
 
-    /*
-    let mut x =
-        <GeneralMatrix<3, 3, f32> as AsLu<3, 3, f32, GeneralLuPivot<3>, GeneralLuError>>::Lu::new(
-            m2,
-        );
+    let start = Instant::now();
+    let result = x.lu();
+    let duration = start.elapsed();
 
-    <GeneralMatrix<3, 3, f32> as AsLu<3, 3, f32, GeneralLuPivot<3>, GeneralLuError>>::fact_internal(
-        &mut x,
-    );
-    println!("{:?}", x);
-    */
+    println!("{:?}", duration);
 
-    /*
-    let d =
-        <GeneralMatrix<3, 3, f32> as AsLu<3, 3, f32, GeneralLuPivot<3>, GeneralLuError>>::lu(m2);
-
-    println!("{:?}", d.unwrap());
-    */
-
-    // let x = <<GeneralMatrix<10, 10, f32> as AsLu<10, 10, f32, GeneralLuPivot<10>, GeneralLuError>>::Lu as LuFormat<GeneralMatrix<10, 10, f32>, GeneralLuPivot<10>>>::new(GeneralMatrix::<10, 10, f32>::zero());
-    /*
-    let x = <GeneralLuFormat<10, 10, f32, GeneralLuPivot<10>> as LuFormat<
-        GeneralMatrix<10, 10, f32>,
-        GeneralLuPivot<10>,
-    >>::new(GeneralMatrix::<10, 10, f32>::zero());
-    */
-    let x = <GeneralLuFormat<10, 10, f32, GeneralLuPivot<10>> as LuFormat<
-        GeneralMatrix<10, 10, f32>,
-        GeneralLuPivot<10>,
-    >>::test;
-
-    print_typename(x);
-
-    let f = crate::factorizations::lu::work;
-    print_typename(f);
-
-    // println!("{:?}", x);
-}
-
-fn print_typename<T>(_: T) {
-    println!("{}", std::any::type_name::<T>());
+    match result {
+        Ok((l, u)) => {
+            // println!("Lu: {:?}", l);
+            println!("{:?}", l.pivot);
+            println!("Error: {}", u);
+        }
+        Err(e) => {
+            println!("Error: {}", e);
+        }
+    }
 }
