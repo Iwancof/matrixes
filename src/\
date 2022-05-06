@@ -11,11 +11,11 @@ pub mod matrix;
 use matrix::general::GeneralMatrix;
 use matrix::tridiagonal::TridiagonalMatrix;
 use matrix::AsMatrix;
-use rand::Rng;
+use rang::Rng;
 
 fn main() {
     // let m = TridiagonalMatrix::new([1, 2, 3], [4, 5, 6, 7], [8, 9, 10]);
-    use factorizations::lu::AsLu;
+    use matrix::factorizations::lu::AsLu;
 
     let mut rng = rand::thread_rng();
 
@@ -27,14 +27,7 @@ fn main() {
             inner[i][j] = rng.gen();
         }
     }
-
     let a = GeneralMatrix::new_col_major_box(inner);
-    println!("Generated");
-    use std::time::Instant;
 
-    let start = Instant::now();
-    a.lu();
-    let elap = start.elapsed();
-
-    println!("elap: {:?}", elap);
+    s.lu();
 }
