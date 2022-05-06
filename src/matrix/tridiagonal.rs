@@ -1,7 +1,9 @@
 use num_traits::Zero;
 
+use super::general::GeneralMatrix;
 use super::{print_matrix_display, AsMatrix};
 
+use core::convert::From;
 use core::fmt::{Display, Formatter, Result};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -249,6 +251,16 @@ where
         } else {
             &self.zero
         }
+    }
+}
+
+impl<const S: usize, Inner> From<GeneralMatrix<S, S, Inner>> for TridiagonalMatrix<S, Inner>
+where
+    Inner: Clone + Zero,
+    [(); S - 1]:,
+{
+    fn from(matrix: GeneralMatrix<S, S, Inner>) -> Self {
+        todo!();
     }
 }
 
